@@ -8,98 +8,129 @@
 
 import SceneKit
 import QuartzCore
+import SceneKit.ModelIO
 
 class GameViewController: NSViewController {
+
+    var scnView: SCNView!
+    var scnScene: SCNScene!
+    var cameraNode: SCNNode!
+    
+    var dotNode: SCNNode!
+    var sphereNode: SCNNode!
+    
+    var dotNodes: [SCNNode]!
+    var sphereNodes: [SCNNode]!
+    
+    var mPosition: simd_float3!
+    
+    var mTick: Float!
+    
+    var mPoints: Int!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
+        mPoints = 32
         
-        // create and add a camera to the scene
-        let cameraNode = SCNNode()
-        cameraNode.camera = SCNCamera()
-        scene.rootNode.addChildNode(cameraNode)
-        
-        // place the camera
-        cameraNode.position = SCNVector3(x: 0, y: 0, z: 15)
-        
-        // create and add a light to the scene
-        let lightNode = SCNNode()
-        lightNode.light = SCNLight()
-        lightNode.light!.type = .omni
-        lightNode.position = SCNVector3(x: 0, y: 10, z: 10)
-        scene.rootNode.addChildNode(lightNode)
-        
-        // create and add an ambient light to the scene
-        let ambientLightNode = SCNNode()
-        ambientLightNode.light = SCNLight()
-        ambientLightNode.light!.type = .ambient
-        ambientLightNode.light!.color = NSColor.darkGray
-        scene.rootNode.addChildNode(ambientLightNode)
-        
-        // retrieve the ship node
-        let ship = scene.rootNode.childNode(withName: "ship", recursively: true)!
-        
-        // animate the 3d object
-        ship.runAction(SCNAction.repeatForever(SCNAction.rotateBy(x: 0, y: 2, z: 0, duration: 1)))
-        
-        // retrieve the SCNView
-        let scnView = self.view as! SCNView
-        
-        // set the scene to the view
-        scnView.scene = scene
-        
-        // allows the user to manipulate the camera
+        mPosition = [0,0,0]
+        mTick = 0
+        scnView = self.view as? SCNView
+        scnView.showsStatistics = false
         scnView.allowsCameraControl = true
+        scnView.autoenablesDefaultLighting = true
         
-        // show statistics such as fps and timing information
-        scnView.showsStatistics = true
+        scnScene = SCNScene()
+        scnScene.background.contents = NSColor.black
+        scnView.scene = scnScene
+    
+        cameraNode = SCNNode()
+        cameraNode.camera = SCNCamera()
+        cameraNode.position = SCNVector3(x:0, y:0, z:100)
+        cameraNode.camera?.zFar = 500
+        scnScene.rootNode.addChildNode(cameraNode)
         
-        // configure the view
-        scnView.backgroundColor = NSColor.black
+        let node = SCNNode()
+        node.name = "PlaneNode"
+        scnScene.rootNode.addChildNode(node)
         
-        // Add a click gesture recognizer
-        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(handleClick(_:)))
-        var gestureRecognizers = scnView.gestureRecognizers
-        gestureRecognizers.insert(clickGesture, at: 0)
-        scnView.gestureRecognizers = gestureRecognizers
+        scnView.delegate = self
+        scnView.rendersContinuously = true
+        
+        setupNodes()
     }
     
-    @objc
-    func handleClick(_ gestureRecognizer: NSGestureRecognizer) {
-        // retrieve the SCNView
-        let scnView = self.view as! SCNView
+    func duplicateNode(node: SCNNode) -> SCNNode {
+        let newNode:SCNNode = node.clone()
+        newNode.geometry = node.geometry
+        return newNode
+    }
+    
+    func createNode() -> (dot: SCNNode, sphere: SCNNode) {
+        let mdlDot = MDLMesh(icosahedronWithExtent: [1.5,1.5,1.5], inwardNormals: false, geometryType: .lines, allocator: nil)
+        let dotNode = SCNNode(mdlObject: mdlDot)
+        dotNode.simdPosition = [0,0,0]
+        let dotMtrl = dotNode.geometry?.materials.first
+        dotMtrl?.lightingModel = .phong
+        dotMtrl?.metalness.contents = 1.0
         
-        // check what nodes are clicked
-        let p = gestureRecognizer.location(in: scnView)
-        let hitResults = scnView.hitTest(p, options: [:])
-        // check that we clicked on at least one object
-        if hitResults.count > 0 {
-            // retrieved the first clicked object
-            let result = hitResults[0]
-            
-            // get its material
-            let material = result.node.geometry!.firstMaterial!
-            
-            // highlight it
-            SCNTransaction.begin()
-            SCNTransaction.animationDuration = 0.5
-            
-            // on completion - unhighlight
-            SCNTransaction.completionBlock = {
-                SCNTransaction.begin()
-                SCNTransaction.animationDuration = 0.5
-                
-                material.emission.contents = NSColor.black
-                
-                SCNTransaction.commit()
-            }
-            
-            material.emission.contents = NSColor.red
-            
-            SCNTransaction.commit()
+        dotMtrl?.diffuse.contents = NSColor(red: 0.6, green: 1.0, blue: 0.6, alpha: 1.0)
+        
+        let mdlSphere = MDLMesh(sphereWithExtent: [4,4,4], segments: [10,10], inwardNormals: false, geometryType: .lines, allocator: nil)
+        let sphereNode = SCNNode(mdlObject: mdlSphere)
+        sphereNode.simdPosition = [0,0,0]
+        let sphereMtrl = sphereNode.geometry?.materials.first
+        sphereMtrl?.lightingModel = .constant
+        sphereMtrl?.diffuse.contents = NSColor.lightGray
+        
+        return (dotNode, sphereNode)
+    }
+    
+    func setupNodes() {
+        let root = scnScene.rootNode.childNode(withName: "PlaneNode", recursively: true)!
+        
+        sphereNodes = [SCNNode]()
+        dotNodes = [SCNNode]()
+        
+        for _ in 0...mPoints-1 {
+            let newNodes = createNode()
+            sphereNodes.append(newNodes.sphere)
+            dotNodes.append(newNodes.dot)
+            root.addChildNode(newNodes.sphere)
+            root.addChildNode(newNodes.dot)
+        }
+    }
+    
+    func ConstrainDistance(point:simd_float3, anchor:simd_float3, distance:Float) -> simd_float3 {
+        return (simd_normalize(point - anchor) * distance) + anchor;
+    }
+}
+
+extension GameViewController: SCNSceneRendererDelegate {
+    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+         
+        mTick = mTick + Float.pi/180
+        mPosition.x = 32 * sin(-2.78*mTick)
+        mPosition.y = 32 * cos(-3.2*mTick)
+        mPosition.z = (64 * sin(1.1*mTick))
+
+        dotNodes[0].simdPosition = mPosition
+        sphereNodes[0].simdPosition = mPosition
+        
+        for i in 1...dotNodes.count-1 {
+            let dotPos = ConstrainDistance(point: dotNodes[i].simdPosition, anchor: dotNodes[i-1].simdPosition, distance: 4)
+            dotNodes[i].simdPosition = dotPos
+            sphereNodes[i].simdPosition = dotPos
+        }
+    
+        dotNodes[dotNodes.count-1].simdPosition = [0,0,0]
+        sphereNodes[dotNodes.count-1].simdPosition = [0,0,0]
+        for i in stride(from:dotNodes.count-1,through:1,by:-1){
+            let dotPos = ConstrainDistance(point: dotNodes[i-1].simdPosition, anchor: dotNodes[i].simdPosition, distance: 4)
+            dotNodes[i-1].simdPosition = dotPos
+            sphereNodes[i-1].simdPosition = dotPos
         }
     }
 }
+
+
