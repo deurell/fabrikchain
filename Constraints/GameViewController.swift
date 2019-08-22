@@ -21,6 +21,8 @@ class GameViewController: NSViewController {
     
     var dotNodes: [SCNNode]!
     var sphereNodes: [SCNNode]!
+    var bezierNode: SCNNode!
+    var bezierShape: SCNShape!
     
     var mPosition: simd_float3!
     
@@ -31,12 +33,12 @@ class GameViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        mPoints = 32
+        mPoints = 16
         
         mPosition = [0,0,0]
         mTick = 0
         scnView = self.view as? SCNView
-        scnView.showsStatistics = false
+        scnView.showsStatistics = true
         scnView.allowsCameraControl = true
         scnView.autoenablesDefaultLighting = true
         
@@ -99,6 +101,11 @@ class GameViewController: NSViewController {
             root.addChildNode(newNodes.sphere)
             root.addChildNode(newNodes.dot)
         }
+        
+        bezierShape = SCNShape()
+        bezierNode = SCNNode(geometry: bezierShape)
+        bezierNode.position = SCNVector3(x: 0, y: 0, z: 0);
+        scnScene.rootNode.addChildNode(bezierNode)
     }
     
     func ConstrainDistance(point:simd_float3, anchor:simd_float3, distance:Float) -> simd_float3 {
@@ -110,10 +117,10 @@ extension GameViewController: SCNSceneRendererDelegate {
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
          
         mTick = mTick + Float.pi/180
-        mPosition.x = 32 * sin(-2.78*mTick)
-        mPosition.y = 32 * cos(-3.2*mTick)
-        mPosition.z = (64 * sin(1.1*mTick))
-
+        mPosition.x = 64 * cos(2.1*mTick) + 32 * cos(0.2*mTick)
+        mPosition.y = 64 * cos(-1.2*mTick) + 64 * sin(0.7*mTick)
+        mPosition.z = 32 * sin(1.3*mTick) - 32 * sin(-0.3*mTick)
+        
         dotNodes[0].simdPosition = mPosition
         sphereNodes[0].simdPosition = mPosition
         
@@ -130,6 +137,11 @@ extension GameViewController: SCNSceneRendererDelegate {
             dotNodes[i-1].simdPosition = dotPos
             sphereNodes[i-1].simdPosition = dotPos
         }
+        
+        
+        
+        //cameraNode.simdPosition = sphereNodes[0].simdPosition
+        //cameraNode.look(at: sphereNodes[4].position)
     }
 }
 
