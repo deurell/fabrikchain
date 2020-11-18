@@ -28,13 +28,11 @@ class GameViewController: NSViewController {
     
     var mTick: Float!
     
-    var mPoints: Int!
+    let mPoints = 16
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        mPoints = 16
-        
+                
         mPosition = [0,0,0]
         mTick = 0
         scnView = self.view as? SCNView
